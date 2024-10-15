@@ -13,42 +13,85 @@ QBCore.Functions.CreateCallback('SpeedCam:CheckOwner', function(source, cb, plat
     end)
 end)
 
+function BuildMailMessage(gender, lastname, speed, vehname, plate, amount)
+    local text = Locales[Config.Locale].dear.." " .. gender .. " " .. lastname .. ",\n "..Locales[Config.Locale].msgpt1..",\n\n"..Locales[Config.Locale].msgpt2.." "..speed.." "..Locales[Config.Locale].msgpt3.." "..vehname.." "..Locales[Config.Locale].msgpt4.." "..plate..",\n\n"..Locales[Config.Locale].msgpt5..amount..".00"
+    return text
+end
+
+function BuildDiscordLogMessage(vehname, plate, speed, firstname, lastname, amount)
+    local discordtext = Locales[Config.Locale].dsmsgpt1..' **'..vehname..'** '..Locales[Config.Locale].msgpt4..' **'..plate..'** '..Locales[Config.Locale].dsmsgpt2..' **'..speed..'** '..Locales[Config.Locale].dsmsgpt3..'.\n\n'..Locales[Config.Locale].dsmsgpt4..' **'..firstname..' '..lastname..'** '..Locales[Config.Locale].dsmsgpt5..' **$'..amount..'.00**\n\n'..Locales[Config.Locale].dsmsgpt6
+    return discordtext
+end
+
+RegisterNetEvent("SpeedCam:server:CreateSpeedCamLog", function(message)
+    if DiscordLogs.enabled then
+        local webHook = DiscordLogs.webhook
+        local embedData = {
+            {
+                ["title"] = Locales[Config.Locale].discordlogtitle,
+                ["color"] = DiscordLogs.embeedColor,
+                ["footer"] = {
+                    ["text"] = os.date("%d-%m-%Y %H:%M"),
+                },
+                ["description"] = message,
+                ["author"] = {
+                    ["name"] = DiscordLogs.embeedName,
+                    ["icon_url"] = DiscordLogs.embeedIcon,
+                },
+            }
+        }
+        PerformHttpRequest(webHook, function() end, "POST", json.encode({ username = "SpeedCamera Report", embeds = embedData}), { ["Content-Type"] = "application/json" })
+        Wait(100)
+        if DiscordLogs.tagUsers then
+            PerformHttpRequest(webHook, function() end, "POST", json.encode({ username = "SpeedCamera Report", content = DiscordLogs.roleIdtotag}), { ["Content-Type"] = "application/json" })
+        end
+    end
+end)
+
+
 RegisterNetEvent('SpeedCam:server:SendBillEmail', function(player, amount, plate, kmh, vehname)
     SetTimeout(math.random(2500, 4000), function()
-        local gender = "Sig."
+        local speed = math.floor(kmh)
+        local gender = Locales[Config.Locale].mr
         if player.PlayerData.charinfo.gender == 1 then
-            gender = "Sig.ra"
+            gender = Locales[Config.Locale].miss
         end
         local charinfo = player.PlayerData.charinfo
-        local messaggio = "Gentile " .. gender .. " " .. charinfo.lastname .. ",\n le inviamo questa mail per notificarle una multa per eccesso di velocità,\n\nLei stava viaggiando a una velocità di "..math.floor(kmh).." KM orari, superiore a quella consentita dal codice stradale a bordo del veicolo "..vehname.." targato "..plate..",\n\nLa sanzione è stato addebitata sul suo conto corrente e ammonta a $"..amount..".00 "
-        -- exports['qs-smartphone-pro']:sendNewMail(player.PlayerData.source, {
-        --     sender = "Dipartimento di Polizia",
-        --     subject = "Sanzione per eccesso di velocità",
-        --     message = messaggio
-        -- })
-        -- local phone = exports['qs-smartphone-pro']:GetPhoneNumberFromIdentifier(player.PlayerData.citizenid, false)
-        -- exports['qs-smartphone-pro']:sendNotificationOld(phone, {
-        --     app = 'mail',
-        --     msg = "Sanzione per eccesso di velocità",
-        --     head = "Dipartimento di Polizia"
-        -- }, false)
-        TriggerEvent('qb-log:server:CreateSpeedCamLog', 'autovelox', 'Multa per eccesso di velocità', 'white', 'Il veicolo modello: **'..vehname..'** targato **'..plate..'** è stato segnalato mentre percorreva il tratto di strada sottoposto a sorveglianza dall\'autovelox fisso, alla velocità di **'..math.floor(kmh)..'** Km orari.\n\nIl veicolo risulta intestato al nominativo di **'..charinfo.firstname..' '..charinfo.lastname..'** al quale è stata emessa e addebitata automaticamente una sanzione pari a **$'..amount..'.00**\n\nNel caso di recidività, si consiglia di convocare il cittadino per avvertirlo di possibili provvedimenti a suo carico.')
-        local phoneNumber = exports["lb-phone"]:GetEquippedPhoneNumber(player.PlayerData.source) or nil
-        if phoneNumber then
-        local mailAddress = exports["lb-phone"]:GetEmailAddress(phoneNumber)
-            exports["lb-phone"]:SendMail({
-                to = mailAddress,
-                sender = "Dipartimento di Polizia",
-                subject = "Sanzione per eccesso di velocità",
-                message = messaggio,
-                attachments = {},
+        local messaggio = BuildMailMessage(gender, charinfo.lastname, speed, vehname, plate, amount)
+        
+        TriggerEvent('SpeedCam:server:CreateSpeedCamLog', BuildDiscordLogMessage(vehname, plate, speed, charinfo.firstname, charinfo.lastname, amount))
+
+        if Config.phonescript == "lb-phone" then
+            local phoneNumber = exports["lb-phone"]:GetEquippedPhoneNumber(player.PlayerData.source) or nil
+            if phoneNumber then
+            local mailAddress = exports["lb-phone"]:GetEmailAddress(phoneNumber)
+                exports["lb-phone"]:SendMail({
+                    to = mailAddress,
+                    sender = Locales[Config.Locale].policedept,
+                    subject = Locales[Config.Locale].mailobj,
+                    message = messaggio,
+                    attachments = {},
+                })
+            end
+        elseif Config.phonescript == "qs-smartphone-pro" then
+            exports['qs-smartphone-pro']:sendNewMail(player.PlayerData.source, {
+                sender = Locales[Config.Locale].policedept,
+                subject = Locales[Config.Locale].mailobj,
+                message = messaggio
             })
+            local phone = exports['qs-smartphone-pro']:GetPhoneNumberFromIdentifier(player.PlayerData.citizenid, false)
+            exports['qs-smartphone-pro']:sendNotificationOld(phone, {
+                app = 'mail',
+                msg = Locales[Config.Locale].mailobj,
+                head = Locales[Config.Locale].policedept
+            }, false)
         end
     end)
 end)
 
 RegisterNetEvent('SpeedCam:server:SendBillEmailOffline', function(citizenid, amount, plate, kmh, vehname)
     MySQL.query('SELECT phone_number FROM `phone_last_phone` WHERE id = citizenid', {citizenid = citizenid}, function(mresult)
+        local speed = math.floor(kmh)
         if mresult then 
             for i = 1, #mresult do
 
@@ -57,20 +100,21 @@ RegisterNetEvent('SpeedCam:server:SendBillEmailOffline', function(citizenid, amo
                 local phoneData = mresult[i]
                 local phoneNumber = phoneData.phone_number
                 local mailAddress = exports["lb-phone"]:GetEmailAddress(phoneNumber)
-                local messaggio = "Gentile " .. playerData.charinfo.gender .. " " .. playerData.charinfo.lastname .. ",\n le inviamo questa mail per notificarle una multa per eccesso di velocità,\n\nLei stava viaggiando a una velocità di "..math.floor(kmh).." KM orari, superiore a quella consentita dal codice stradale a bordo del veicolo "..vehname.." targato "..plate..",\n\nLa sanzione è stato addebitata sul suo conto corrente e ammonta a $"..amount..".00 "
+                local charinfo = playerData.charinfo
+                local messaggio = BuildMailMessage(playerData.charinfo.gender, charinfo.lastname, speed, vehname, plate, amount)
 
                 if mailAddress then
                     exports["lb-phone"]:SendMail({
                         to = mailAddress,
-                        sender = "Dipartimento di Polizia",
-                        subject = "Sanzione per eccesso di velocità",
+                        sender = Locales[Config.Locale].policedept,
+                        subject = Locales[Config.Locale].mailobj,
                         message = messaggio,
                         attachments = {},
                     })
-                    TriggerEvent('qb-log:server:CreateSpeedCamLog', 'autovelox', 'Multa per eccesso di velocità', 'white', 'Il veicolo modello: **'..vehname..'** targato **'..plate..'** è stato segnalato mentre percorreva il tratto di strada sottoposto a sorveglianza dall\'autovelox fisso, alla velocità di **'..math.floor(kmh)..'** Km orari.\n\nIl veicolo risulta intestato al nominativo di **'..playerData["firstname"]..' '..playerData["lastname"]..'** al quale è stata emessa e addebitata automaticamente una sanzione pari a **$'..amount..'.00**\n\nNel caso di recidività, si consiglia di convocare il cittadino per avvertirlo di possibili provvedimenti a suo carico.')
-                    print("Notifica Speedcam via mail offline inviata a "..playerData["firstname"].." "..playerData["lastname"])
-                else
-                    print("Non sono riuscito a trovare la mail del player per inviare la notifica di sanzione via mail, probabilmente il player non ha un account inserito o c'è un problema con il codice")
+
+                    TriggerEvent('SpeedCam:server:CreateSpeedCamLog', BuildDiscordLogMessage(vehname, plate, speed, charinfo.firstname, charinfo.lastname, amount))
+                    
+                    print("Offline Speedcam mail sent to "..playerData["firstname"].." "..playerData["lastname"])
                 end
             end
         end
@@ -86,10 +130,9 @@ RegisterNetEvent('SpeedCam:BillPlayer', function(bill, plate, kmh, vehname)
                 local player = QBCore.Functions.GetPlayerByCitizenId(data.citizenid)
                 if player then
                     TriggerEvent('SpeedCam:server:SendBillEmail', player, bill, plate, kmh, vehname)
-                    player.Functions.RemoveMoney("bank", bill, "Multa Stradale")
-                    local amount = math.floor(bill * 0.5)
-                    TriggerEvent('qb-bossmenu:server:addAccountMoney', src, "police", (amount/2))
-                    TriggerEvent('qb-bossmenu:server:addAccountMoney', src, "sheriff", (amount/2))
+                    player.Functions.RemoveMoney("bank", bill, Locales[Config.Locale].bill)
+                    TriggerEvent('qb-bossmenu:server:addAccountMoney', src, "police", (bill/2))
+                    TriggerEvent('qb-bossmenu:server:addAccountMoney', src, "sheriff", (bill/2))
                 else
                     TriggerEvent('SpeedCam:server:SendBillEmailOffline', data.citizenid, bill, plate, kmh, vehname)
                     local PlayerData = exports.oxmysql:executeSync('SELECT * FROM players WHERE citizenid = ?', { data.citizenid })
@@ -97,10 +140,9 @@ RegisterNetEvent('SpeedCam:BillPlayer', function(bill, plate, kmh, vehname)
                     local moneyData = PlayerData[1].money
                     moneyData = json.decode(moneyData)
                     moneyData["bank"] = moneyData["bank"] - bill
-                    local amount = math.floor(bill * 0.5)
                     exports.oxmysql:execute('UPDATE players SET money = ? WHERE citizenid = ?', { json.encode(moneyData), data.citizenid })
-                    TriggerEvent('qb-bossmenu:server:addAccountMoney', src, "police", (amount/2))
-                    TriggerEvent('qb-bossmenu:server:addAccountMoney', src, "sheriff", (amount/2))
+                    TriggerEvent('qb-bossmenu:server:addAccountMoney', src, "police", (bill/2))
+                    TriggerEvent('qb-bossmenu:server:addAccountMoney', src, "sheriff", (bill/2))
                 end
             end
         end

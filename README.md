@@ -11,7 +11,7 @@ Script that makes speed cameras working in the city:
 - Credit the amount to the police account
 - They recognize the owner of the vehicle by the license plate
 - Excludes Police, EMS and any Job you want
-- Sends a recap email to the car owner (if you use LB-Phone \ Quasar-Smartphone \ QB-Phone)
+- Sends a recap email to the car owner (if you use LB-Phone \ Quasar-Smartphone Pro)
 
 Compatible with OneSync
 ---
