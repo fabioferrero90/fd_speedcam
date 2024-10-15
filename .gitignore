@@ -24,4 +24,4 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-/shared/discordlogs.lua
+shared/discordlogs.lua
