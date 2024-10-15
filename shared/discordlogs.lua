@@ -1,7 +1,7 @@
 DiscordLogs = {
 
     enabled = true,
-    webhook = "",
+    webhook = "PUTYOURAPIKEYHERE",
 
     tagUsers = false,
     roleIdtotag = "<@&INSERTIDHERE>",
