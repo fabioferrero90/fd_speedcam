@@ -3,6 +3,7 @@ game 'gta5'
 
 author 'RealSly - FullDevs'
 version '1.0.1'
+lua54 'yes'
 
 shared_scripts {
 	'shared/*.lua'
